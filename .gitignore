@@ -1,0 +1,13 @@
+# Ignore environment files
+.env
+# Ignore all JSON files
+*.json
+# Ignore Jupyter notebook checkpoints
+*.ipynb_checkpoints/
+# Ignore system files
+*.DS_Store
+# Ignore Python environment folders
+venv/
+__pycache__/
+*.pyc
+.env
