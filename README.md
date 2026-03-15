@@ -6,6 +6,7 @@ Este projeto reúne exercícios e anotações práticas de Google Cloud Platform
 
 ### Estrutura principal
 - `01_create_bucket.py`: script Python para criar bucket no Cloud Storage.
+- `gcp_access_audit/`: auditoria de acesso GCP com relatório executivo em Markdown (PT-BR e EN).
 - `0_gcp_commands_utils.ipynb`: comandos e utilitários GCP.
 - `1-Data_Engineering_Fundations.ipynb`: fundamentos de Data Engineering.
 - `2-Google_cloud-data-storage.ipynb`: práticas de Cloud Storage.
@@ -44,6 +45,7 @@ This project contains practical Google Cloud Platform (GCP) exercises and notes,
 
 ### Main structure
 - `01_create_bucket.py`: Python script to create a Cloud Storage bucket.
+- `gcp_access_audit/`: GCP access audit with executive Markdown reports (PT-BR and EN).
 - `0_gcp_commands_utils.ipynb`: GCP helper commands and utilities.
 - `1-Data_Engineering_Fundations.ipynb`: Data Engineering foundations.
 - `2-Google_cloud-data-storage.ipynb`: Cloud Storage practices.

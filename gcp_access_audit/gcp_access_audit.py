@@ -528,65 +528,140 @@ def summarize_report_for_terminal(report: dict[str, Any], language: str) -> dict
     }
 
 
-def build_txt_content(
+def build_markdown_content(
     report: dict[str, Any],
     language: str,
     executed_at: str,
     project_root: Path,
 ) -> str:
-    """Builds plain text content for report export."""
+    """Builds a human-friendly Markdown report.
+
+    The output is designed for non-technical readers first, while still keeping
+    the full technical JSON at the end for troubleshooting.
+    """
     title = next(iter(report.keys()))
     payload = report[title]
 
     capabilities_key = "capacidades" if language == "pt-BR" else "capabilities"
     access_level_key = "nivel_de_acesso" if language == "pt-BR" else "access_level"
+    connection_key = "conexao" if language == "pt-BR" else "connection"
+    recommendations_key = "acoes_recomendadas" if language == "pt-BR" else "recommended_actions"
+
+    capabilities = payload.get(capabilities_key, {})
+    allowed_tokens = {"permitido", "allowed"}
+    denied_tokens = {"negado", "denied"}
+    not_verified_tokens = {"nao_verificado", "not_verified"}
+
+    allowed_items = [name for name, status in capabilities.items() if str(status).lower() in allowed_tokens]
+    denied_items = [name for name, status in capabilities.items() if str(status).lower() in denied_tokens]
+    not_verified_items = [
+        name for name, status in capabilities.items() if str(status).lower() in not_verified_tokens
+    ]
+
+    connection_status = payload.get(connection_key, {}).get("status")
+    recommendations = payload.get(recommendations_key, [])
 
     if language == "pt-BR":
-        header_date = f"Data de execução: {executed_at}"
-        header_path = f"Caminho do projeto: {project_root}"
-        summary_title = "Resumo de acessos:"
-        level_title = "Nível de acesso"
-        full_title = "Relatório completo:"
+        header_date = f"**Data de execução:** {executed_at}"
+        header_path = f"**Caminho do projeto:** {project_root}"
+        executive_title = "Leitura rápida"
+        connection_line = f"Conexão com GCP: {connection_status}"
+        level_line = f"Nível atual estimado: {payload.get(access_level_key)}"
+        allowed_title = "O que foi confirmado que você pode fazer"
+        denied_title = "O que foi confirmado que você não pode fazer"
+        not_verified_title = "O que ainda não foi possível verificar"
+        explanation_title = "Como interpretar"
+        explanation_lines = [
+            "- permitido: confirmado por teste real.",
+            "- negado: testado e sem permissão no cenário atual.",
+            "- nao_verificado: não foi possível validar, normalmente por API desabilitada ou falta de visibilidade.",
+        ]
+        next_steps_title = "Próximos passos recomendados"
+        technical_title = "Apêndice técnico"
+        structured_summary_title = "Resumo estruturado"
+        full_json_title = "Relatório JSON completo"
+        empty_line_message = "Nenhum item nesta categoria."
     else:
-        header_date = f"Execution date: {executed_at}"
-        header_path = f"Project path: {project_root}"
-        summary_title = "Access summary:"
-        level_title = "Access level"
-        full_title = "Full report:"
+        header_date = f"**Execution date:** {executed_at}"
+        header_path = f"**Project path:** {project_root}"
+        executive_title = "Quick read"
+        connection_line = f"GCP connection: {connection_status}"
+        level_line = f"Estimated current level: {payload.get(access_level_key)}"
+        allowed_title = "What was confirmed as allowed"
+        denied_title = "What was confirmed as not allowed"
+        not_verified_title = "What could not be verified yet"
+        explanation_title = "How to read this report"
+        explanation_lines = [
+            "- allowed: confirmed by a real check.",
+            "- denied: tested and not allowed in the current scenario.",
+            "- not_verified: could not be validated, usually because an API is disabled or visibility is limited.",
+        ]
+        next_steps_title = "Recommended next steps"
+        technical_title = "Technical appendix"
+        structured_summary_title = "Structured summary"
+        full_json_title = "Full JSON report"
+        empty_line_message = "No items in this category."
+
+    def render_items(items: list[str]) -> list[str]:
+        if not items:
+            return [f"- {empty_line_message}"]
+        return [f"- {item}" for item in items]
 
     lines = [
-        title,
-        "=" * len(title),
+        f"# {title}",
+        "",
         header_date,
         header_path,
         "",
-        summary_title,
-        json.dumps(payload.get(capabilities_key, {}), indent=2, ensure_ascii=False),
+        f"## {executive_title}",
+        "- " + connection_line,
+        "- " + level_line,
         "",
-        f"{level_title}: {payload.get(access_level_key)}",
+        f"## {allowed_title}",
+        *render_items(allowed_items),
         "",
-        full_title,
+        f"## {denied_title}",
+        *render_items(denied_items),
+        "",
+        f"## {not_verified_title}",
+        *render_items(not_verified_items),
+        "",
+        f"## {explanation_title}",
+        *explanation_lines,
+        "",
+        f"## {next_steps_title}",
+        *(recommendations if recommendations else [empty_line_message]),
+        "",
+        f"## {technical_title}",
+        f"### {structured_summary_title}",
+        "```json",
+        json.dumps(capabilities, indent=2, ensure_ascii=False),
+        "```",
+        "",
+        f"### {full_json_title}",
+        "```json",
         json.dumps(report, indent=2, ensure_ascii=False),
+        "```",
         "",
     ]
     return "\n".join(lines)
 
 
-def export_txt_reports(base_dir: Path, config: AuditConfig, logger: logging.Logger) -> None:
-    """Exports PT-BR and EN TXT reports automatically."""
+def export_markdown_reports(base_dir: Path, config: AuditConfig, logger: logging.Logger) -> None:
+    """Exports PT-BR and EN Markdown reports automatically."""
     project_root = base_dir.parent
     executed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     outputs = [
-        ("pt-BR", base_dir / "relatorio_acesso_ptbr.txt"),
-        ("en", base_dir / "access_report_en.txt"),
+        ("pt-BR", base_dir / "relatorio_acesso_ptbr.md"),
+        ("en", base_dir / "access_report_en.md"),
     ]
 
     for language, target_path in outputs:
         report = run_audit(base_dir, config, language)
-        content = build_txt_content(report, language, executed_at, project_root)
+        content = build_markdown_content(report, language, executed_at, project_root)
         target_path.write_text(content, encoding="utf-8")
-        logger.info("📄 TXT exported: %s", target_path)
+        logger.info("📄 Markdown exported: %s", target_path)
 
 
 def load_config(config_path: Path) -> AuditConfig:
@@ -645,8 +720,8 @@ def main() -> None:
     logger.info("🧾 Full report (JSON):")
     print(json.dumps(report, indent=2, ensure_ascii=False))
 
-    logger.info("📦 Exporting TXT reports automatically (PT-BR + EN)...")
-    export_txt_reports(base_dir, config, logger)
+    logger.info("📦 Exporting Markdown reports automatically (PT-BR + EN)...")
+    export_markdown_reports(base_dir, config, logger)
     logger.info("🎉 Audit flow completed.")
 
 
