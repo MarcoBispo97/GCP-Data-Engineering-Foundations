@@ -6,7 +6,7 @@ This script checks:
 - IAM policy visibility.
 - Effective permissions related to bucket/object operations.
 
-It also exports TXT reports automatically in PT-BR and EN.
+It also exports Markdown reports automatically in PT-BR and EN.
 """
 
 from __future__ import annotations
@@ -134,8 +134,17 @@ class GCPAccessAuditor:
             bucket_metadata,
             storage_bucket_permissions,
         )
-        level = self._infer_access_level(i18n, permissions_result)
-        recommendations = self._build_recommendations(i18n, permissions_result)
+        level = self._infer_access_level(
+            i18n,
+            permissions_result,
+            storage_bucket_permissions,
+            bucket_metadata,
+        )
+        recommendations = self._build_recommendations(
+            i18n,
+            permissions_result,
+            storage_bucket_permissions,
+        )
 
         return {
             i18n.label("report_title"): {
@@ -352,7 +361,6 @@ class GCPAccessAuditor:
             return i18n.value("allowed") if permission in granted_set else i18n.value("denied")
 
         capability_map: dict[str, str] = {}
-
         capability_map[i18n.capability_name("create_bucket")] = resolve(
             "storage.buckets.create",
             project_verified,
@@ -396,35 +404,41 @@ class GCPAccessAuditor:
         )
         return capability_map
 
-    def _infer_access_level(self, i18n: Localization, permissions_result: dict[str, Any]) -> str:
-        """Infers a coarse access level based on effective permissions."""
-        if not permissions_result.get("verified"):
+    def _infer_access_level(
+        self,
+        i18n: Localization,
+        permissions_result: dict[str, Any],
+        storage_bucket_permissions: dict[str, Any],
+        bucket_metadata: dict[str, Any],
+    ) -> str:
+        """Infers a coarse access level from project and bucket checks combined."""
+        if not permissions_result.get("verified") and not storage_bucket_permissions.get("verified"):
             return i18n.level("restricted")
 
-        granted = set(permissions_result.get("granted_permissions", []))
+        project_granted = set(permissions_result.get("granted_permissions", []))
+        bucket_granted = set(storage_bucket_permissions.get("granted_permissions", []))
 
-        admin_requirements = {
-            "storage.buckets.create",
-            "storage.buckets.delete",
-            "storage.objects.create",
-            "storage.objects.delete",
-            "resourcemanager.projects.getIamPolicy",
-        }
-        editor_requirements = {
-            "storage.objects.create",
-            "storage.objects.delete",
-            "resourcemanager.projects.get",
-        }
-        viewer_requirements = {
-            "resourcemanager.projects.get",
-            "storage.objects.get",
-        }
+        can_create_bucket = "storage.buckets.create" in project_granted
+        can_delete_bucket = "storage.buckets.delete" in bucket_granted
+        can_upload_object = "storage.objects.create" in bucket_granted
+        can_delete_object = "storage.objects.delete" in bucket_granted
+        can_read_object = "storage.objects.get" in bucket_granted
+        can_read_project = "resourcemanager.projects.get" in project_granted
+        can_read_iam = "resourcemanager.projects.getIamPolicy" in project_granted
+        can_read_bucket_metadata = bool(bucket_metadata.get("can_read_bucket_metadata"))
 
-        if admin_requirements.issubset(granted):
+        if (
+            can_create_bucket
+            and can_delete_bucket
+            and can_upload_object
+            and can_delete_object
+            and can_read_object
+            and can_read_iam
+        ):
             return i18n.level("admin")
-        if editor_requirements.issubset(granted):
+        if can_upload_object and can_delete_object and (can_read_project or can_read_bucket_metadata):
             return i18n.level("editor")
-        if viewer_requirements.intersection(granted):
+        if can_read_project or can_read_object or can_read_bucket_metadata:
             return i18n.level("viewer")
         return i18n.level("restricted")
 
@@ -432,6 +446,7 @@ class GCPAccessAuditor:
         self,
         i18n: Localization,
         permissions_result: dict[str, Any],
+        storage_bucket_permissions: dict[str, Any],
     ) -> list[str]:
         """Creates actionable recommendations based on missing permissions."""
         if not permissions_result.get("verified"):
@@ -448,6 +463,7 @@ class GCPAccessAuditor:
             ]
 
         missing = set(permissions_result.get("missing_permissions", []))
+        bucket_granted = set(storage_bucket_permissions.get("granted_permissions", []))
         recommendations: list[str] = []
 
         if not missing:
@@ -464,11 +480,23 @@ class GCPAccessAuditor:
                 if i18n.language == "en"
                 else "Solicite um papel com storage.buckets.create (ex.: Storage Admin)."
             )
-        if "storage.objects.create" in missing:
+        if "storage.objects.create" in missing and "storage.objects.create" not in bucket_granted:
             recommendations.append(
                 "Ask for object upload permission (storage.objects.create)."
                 if i18n.language == "en"
                 else "Solicite permissão de upload de objetos (storage.objects.create)."
+            )
+        if "storage.objects.delete" in missing and "storage.objects.delete" not in bucket_granted:
+            recommendations.append(
+                "Ask for object delete permission (storage.objects.delete)."
+                if i18n.language == "en"
+                else "Solicite permissão para excluir objetos (storage.objects.delete)."
+            )
+        if "storage.objects.get" in missing and "storage.objects.get" not in bucket_granted:
+            recommendations.append(
+                "Ask for object read permission (storage.objects.get)."
+                if i18n.language == "en"
+                else "Solicite permissão para ler objetos (storage.objects.get)."
             )
         if "resourcemanager.projects.getIamPolicy" in missing:
             recommendations.append(
@@ -695,7 +723,7 @@ def load_config(config_path: Path) -> AuditConfig:
 
 
 def main() -> None:
-    """Runs the GCP access audit with friendly logs and auto TXT export."""
+    """Runs the GCP access audit with friendly logs and auto Markdown export."""
     logger = setup_logging()
     base_dir = Path(__file__).resolve().parent
     config = load_config(base_dir / "config.yaml")

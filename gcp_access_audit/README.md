@@ -1,29 +1,38 @@
 # GCP Access Audit
 
-Ferramenta de auditoria para entender, de forma simples, o que a conta atual consegue fazer no Google Cloud.
+Ferramenta para auditar, por API, o que a identidade autenticada consegue ver e fazer no projeto GCP e no bucket configurado.
 
-Audit tool to understand, in a simple way, what the current account can do in Google Cloud.
+Tool to audit, through API checks, what the authenticated identity can see and do in the target GCP project and bucket.
 
 ---
 
 ## 🇧🇷 Português (PT-BR)
 
-### O que esta pasta entrega
+### Objetivo
 
-- Um script Python que testa conexão com o GCP.
-- Verificações de acesso ao projeto, IAM e permissões de Storage.
-- Um resumo amigável no terminal.
-- Relatórios em Markdown prontos para leitura humana.
+Esta pasta concentra uma auditoria prática para responder três perguntas de forma objetiva:
+
+- a conexão com o GCP está funcionando;
+- o projeto e a política IAM do projeto estão visíveis;
+- quais ações de Storage estão efetivamente permitidas no bucket analisado.
+
+### O que a auditoria verifica
+
+- Conectividade com as credenciais locais atuais.
+- Leitura de metadados do projeto via Cloud Resource Manager API.
+- Leitura da política IAM do projeto.
+- `testIamPermissions` no projeto para permissões configuradas.
+- `test_iam_permissions` no bucket para validar ações de bucket e objetos.
+- Geração de um nível estimado de acesso com base nas permissões confirmadas.
 
 ### Arquivos principais
 
-- `gcp_access_audit.py`: script principal da auditoria.
-- `config.yaml`: projeto, bucket de checagem, idioma e permissões a testar.
-- `messages_pt-BR.yaml`: textos localizados em português.
-- `messages_en.yaml`: textos localizados em inglês.
-- `requirements.txt`: dependências da auditoria.
+- `gcp_access_audit.py`: script principal.
+- `config.yaml`: idioma, projeto, bucket de referência e permissões a testar.
+- `messages_pt-BR.yaml`: rótulos e mensagens em português.
+- `messages_en.yaml`: rótulos e mensagens em inglês.
 - `relatorio_acesso_ptbr.md`: relatório em português gerado automaticamente.
-- `access_report_en.md`: report in English generated automatically.
+- `access_report_en.md`: relatório em inglês gerado automaticamente.
 
 ### Como executar
 
@@ -31,73 +40,63 @@ Audit tool to understand, in a simple way, what the current account can do in Go
 C:/Users/marco/Documents/code_classes/GCP-Data-Engineering-Foundations/venv/Scripts/python.exe C:/Users/marco/Documents/code_classes/GCP-Data-Engineering-Foundations/gcp_access_audit/gcp_access_audit.py
 ```
 
-### O que acontece quando você roda
+### Como interpretar a saída
 
-O script:
+- `permitido`: a ação foi confirmada por chamada de API.
+- `negado`: a API respondeu sem essa permissão no contexto atual.
+- `nao_verificado`: faltou visibilidade suficiente para concluir o teste.
 
-- testa a conexão com o GCP;
-- verifica visibilidade de projeto e IAM;
-- testa permissões reais no bucket configurado;
-- mostra um resumo executivo no terminal;
-- gera relatórios em Markdown em PT-BR e EN.
+### Como o nível de acesso é calculado
 
-### Como interpretar o relatório
+- `ADMIN`: consegue criar e deletar bucket, enviar, excluir e ler objetos, além de ler IAM do projeto.
+- `EDITOR`: consegue alterar objetos e possui visibilidade mínima de projeto ou bucket.
+- `LEITOR`: consegue apenas leitura de projeto, bucket ou objetos.
+- `RESTRITO`: a auditoria não conseguiu confirmar leitura ou alteração relevantes.
 
-- `permitido`: foi testado e confirmado.
-- `negado`: foi testado e a permissão não está disponível.
-- `nao_verificado`: não foi possível validar, normalmente por API desabilitada ou falta de visibilidade.
+### Limitações importantes
 
-### Quando o resultado pode parecer “mais restrito” do que a realidade
+- O resultado é uma estimativa baseada apenas nas permissões testadas.
+- Permissões de projeto e de bucket podem divergir; por isso o relatório mostra as duas visões.
+- Se a `Cloud Resource Manager API` estiver desabilitada, parte da análise pode cair para `nao_verificado`.
 
-Isso acontece quando alguma API necessária para auditoria não está habilitada.
+### Ajustes mais comuns
 
-Exemplo comum:
+No `config.yaml` você normalmente altera:
 
-- `Cloud Resource Manager API` desabilitada.
-
-Nesse caso, o relatório pode marcar parte das permissões como `nao_verificado`, mesmo que você consiga operar normalmente no Cloud Storage.
-
-### Trocar idioma
-
-No `config.yaml`:
-
-- `language: pt-BR`
-- `language: en`
-
-### Resultado esperado
-
-No terminal:
-
-- status da conexão;
-- nível estimado de acesso;
-- quantidade de capacidades permitidas;
-- quantidade de capacidades não verificadas.
-
-Nos arquivos gerados:
-
-- leitura executiva para não devs;
-- apêndice técnico em JSON.
+- `language`
+- `project_id`
+- `bucket_name_for_checks`
+- `test_permissions`
 
 ---
 
 ## 🇺🇸 English
 
-### What this folder provides
+### Purpose
 
-- A Python script that tests GCP connectivity.
-- Access checks for project visibility, IAM, and Storage permissions.
-- A friendly terminal summary.
-- Human-readable Markdown reports.
+This folder contains a practical audit that answers three direct questions:
+
+- is GCP connectivity working;
+- are project metadata and project IAM policy visible;
+- which Storage actions are effectively allowed on the configured bucket.
+
+### What the audit checks
+
+- Connectivity with the current local credentials.
+- Project metadata visibility through Cloud Resource Manager API.
+- Project IAM policy visibility.
+- `testIamPermissions` at project level for configured permissions.
+- `test_iam_permissions` at bucket level for bucket and object actions.
+- A derived access level based on the permissions that were actually confirmed.
 
 ### Main files
 
-- `gcp_access_audit.py`: main audit script.
-- `config.yaml`: project, check bucket, language, and permissions to test.
-- `messages_pt-BR.yaml`: Portuguese localized texts.
-- `messages_en.yaml`: English localized texts.
-- `requirements.txt`: audit dependencies.
-- `relatorio_acesso_ptbr.md`: automatically generated Portuguese report.
-- `access_report_en.md`: automatically generated English report.
+- `gcp_access_audit.py`: main script.
+- `config.yaml`: language, project, reference bucket, and permissions to test.
+- `messages_pt-BR.yaml`: Portuguese labels and messages.
+- `messages_en.yaml`: English labels and messages.
+- `relatorio_acesso_ptbr.md`: auto-generated Portuguese report.
+- `access_report_en.md`: auto-generated English report.
 
 ### How to run
 
@@ -105,49 +104,30 @@ Nos arquivos gerados:
 C:/Users/marco/Documents/code_classes/GCP-Data-Engineering-Foundations/venv/Scripts/python.exe C:/Users/marco/Documents/code_classes/GCP-Data-Engineering-Foundations/gcp_access_audit/gcp_access_audit.py
 ```
 
-### What happens when you run it
+### How to read the output
 
-The script:
+- `allowed`: the action was confirmed through an API check.
+- `denied`: the API check completed and the permission was not available.
+- `not_verified`: visibility was not sufficient to conclude the test.
 
-- tests GCP connectivity;
-- checks project and IAM visibility;
-- tests real permissions against the configured bucket;
-- prints an executive-style summary in the terminal;
-- generates Markdown reports in PT-BR and EN.
+### How the access level is derived
 
-### How to read the report
+- `ADMIN`: can create and delete buckets, upload, delete, and read objects, and read project IAM.
+- `EDITOR`: can modify objects and has minimum project or bucket visibility.
+- `VIEWER`: can only read project, bucket, or objects.
+- `RESTRICTED`: the audit could not confirm meaningful read or write access.
 
-- `allowed`: tested and confirmed.
-- `denied`: tested and not available.
-- `not_verified`: could not be validated, usually because an API is disabled or visibility is limited.
+### Important limitations
 
-### When results may look more restrictive than reality
+- The result is an estimate based only on the permissions being tested.
+- Project-level and bucket-level permissions may differ, so the report shows both perspectives.
+- If `Cloud Resource Manager API` is disabled, part of the audit may fall back to `not_verified`.
 
-This usually happens when a required audit API is disabled.
+### Most common config changes
 
-Common example:
+In `config.yaml`, you will usually adjust:
 
-- `Cloud Resource Manager API` is disabled.
-
-In that case, some permissions may appear as `not_verified`, even when Cloud Storage operations are working.
-
-### Change the language
-
-In `config.yaml`:
-
-- `language: pt-BR`
-- `language: en`
-
-### Expected output
-
-In the terminal:
-
-- connection status;
-- estimated access level;
-- number of allowed capabilities;
-- number of not-verified capabilities.
-
-In the generated files:
-
-- executive summary for non-developers;
-- technical JSON appendix.
+- `language`
+- `project_id`
+- `bucket_name_for_checks`
+- `test_permissions`
