@@ -126,8 +126,14 @@ class GCPAccessAuditor:
         iam = self._check_iam_visibility(i18n)
         permissions_result = self._check_permissions(i18n)
         bucket_metadata = self._check_bucket_metadata_access(i18n)
+        storage_bucket_permissions = self._check_storage_bucket_permissions(i18n)
 
-        capabilities = self._build_capabilities(i18n, permissions_result, bucket_metadata)
+        capabilities = self._build_capabilities(
+            i18n,
+            permissions_result,
+            bucket_metadata,
+            storage_bucket_permissions,
+        )
         level = self._infer_access_level(i18n, permissions_result)
         recommendations = self._build_recommendations(i18n, permissions_result)
 
@@ -137,11 +143,18 @@ class GCPAccessAuditor:
                 i18n.label("hierarchy"): hierarchy,
                 i18n.label("iam"): iam,
                 i18n.label("permissions"): permissions_result,
+                "storage_bucket_permissions": storage_bucket_permissions,
                 i18n.label("capabilities"): capabilities,
                 i18n.label("access_level"): level,
                 i18n.label("recommended_actions"): recommendations,
             }
         }
+
+    @staticmethod
+    def _is_service_disabled_error(error_text: str) -> bool:
+        """Checks whether an API error represents SERVICE_DISABLED."""
+        upper_text = error_text.upper()
+        return "SERVICE_DISABLED" in upper_text or "HAS NOT BEEN USED IN PROJECT" in upper_text
 
     def _check_connection(self, i18n: Localization) -> dict[str, Any]:
         """Checks token/session and storage API connectivity."""
@@ -213,12 +226,18 @@ class GCPAccessAuditor:
         response = self.session.post(url, json={"permissions": self.config.test_permissions})
 
         if response.status_code != 200:
+            error_text = response.text
+            service_disabled = self._is_service_disabled_error(error_text)
             return {
                 "status": i18n.value("failed"),
                 "http_status": response.status_code,
                 "granted_permissions": [],
                 "missing_permissions": self.config.test_permissions,
-                "error": response.text,
+                "error": error_text,
+                "verified": False,
+                "not_verified_reason": (
+                    "resource_manager_api_disabled" if service_disabled else "api_error"
+                ),
             }
 
         payload = response.json()
@@ -230,7 +249,63 @@ class GCPAccessAuditor:
             "status": i18n.value("ok"),
             "granted_permissions": granted,
             "missing_permissions": missing,
+            "verified": True,
+            "not_verified_reason": None,
         }
+
+    def _check_storage_bucket_permissions(self, i18n: Localization) -> dict[str, Any]:
+        """Checks bucket-level Storage permissions directly via Storage API.
+
+        Returns:
+            Dictionary with direct bucket permission checks.
+        """
+        try:
+            bucket = self.storage_client.lookup_bucket(self.config.bucket_name_for_checks)
+            if bucket is None:
+                return {
+                    "status": i18n.value("failed"),
+                    "verified": False,
+                    "granted_permissions": [],
+                    "requested_permissions": [
+                        "storage.buckets.get",
+                        "storage.buckets.delete",
+                        "storage.objects.create",
+                        "storage.objects.delete",
+                        "storage.objects.get",
+                    ],
+                    "not_verified_reason": "bucket_not_visible",
+                }
+
+            requested_permissions = [
+                "storage.buckets.get",
+                "storage.buckets.delete",
+                "storage.objects.create",
+                "storage.objects.delete",
+                "storage.objects.get",
+            ]
+            granted = bucket.test_iam_permissions(requested_permissions)
+            return {
+                "status": i18n.value("ok"),
+                "verified": True,
+                "requested_permissions": requested_permissions,
+                "granted_permissions": granted,
+                "not_verified_reason": None,
+            }
+        except Exception as error:
+            return {
+                "status": i18n.value("failed"),
+                "verified": False,
+                "granted_permissions": [],
+                "requested_permissions": [
+                    "storage.buckets.get",
+                    "storage.buckets.delete",
+                    "storage.objects.create",
+                    "storage.objects.delete",
+                    "storage.objects.get",
+                ],
+                "not_verified_reason": "storage_api_error",
+                "error": str(error),
+            }
 
     def _check_bucket_metadata_access(self, i18n: Localization) -> dict[str, Any]:
         """Checks whether configured bucket metadata is readable."""
@@ -262,25 +337,57 @@ class GCPAccessAuditor:
         i18n: Localization,
         permissions_result: dict[str, Any],
         bucket_metadata: dict[str, Any],
+        storage_bucket_permissions: dict[str, Any],
     ) -> dict[str, str]:
         """Builds localized capability map based on permission checks."""
-        granted = set(permissions_result.get("granted_permissions", []))
+        project_granted = set(permissions_result.get("granted_permissions", []))
+        bucket_granted = set(storage_bucket_permissions.get("granted_permissions", []))
 
-        capability_rules = {
-            "create_bucket": "storage.buckets.create",
-            "delete_bucket": "storage.buckets.delete",
-            "upload_object": "storage.objects.create",
-            "delete_object": "storage.objects.delete",
-            "read_object": "storage.objects.get",
-            "read_project": "resourcemanager.projects.get",
-            "read_iam_policy": "resourcemanager.projects.getIamPolicy",
-        }
+        project_verified = bool(permissions_result.get("verified"))
+        bucket_verified = bool(storage_bucket_permissions.get("verified"))
+
+        def resolve(permission: str, verified: bool, granted_set: set[str]) -> str:
+            if not verified:
+                return i18n.value("not_verified")
+            return i18n.value("allowed") if permission in granted_set else i18n.value("denied")
 
         capability_map: dict[str, str] = {}
-        for capability_key, permission_key in capability_rules.items():
-            capability_map[i18n.capability_name(capability_key)] = (
-                i18n.value("allowed") if permission_key in granted else i18n.value("denied")
-            )
+
+        capability_map[i18n.capability_name("create_bucket")] = resolve(
+            "storage.buckets.create",
+            project_verified,
+            project_granted,
+        )
+        capability_map[i18n.capability_name("delete_bucket")] = resolve(
+            "storage.buckets.delete",
+            bucket_verified,
+            bucket_granted,
+        )
+        capability_map[i18n.capability_name("upload_object")] = resolve(
+            "storage.objects.create",
+            bucket_verified,
+            bucket_granted,
+        )
+        capability_map[i18n.capability_name("delete_object")] = resolve(
+            "storage.objects.delete",
+            bucket_verified,
+            bucket_granted,
+        )
+        capability_map[i18n.capability_name("read_object")] = resolve(
+            "storage.objects.get",
+            bucket_verified,
+            bucket_granted,
+        )
+        capability_map[i18n.capability_name("read_project")] = resolve(
+            "resourcemanager.projects.get",
+            project_verified,
+            project_granted,
+        )
+        capability_map[i18n.capability_name("read_iam_policy")] = resolve(
+            "resourcemanager.projects.getIamPolicy",
+            project_verified,
+            project_granted,
+        )
 
         capability_map[i18n.capability_name("read_bucket_metadata")] = (
             i18n.value("allowed")
@@ -291,6 +398,9 @@ class GCPAccessAuditor:
 
     def _infer_access_level(self, i18n: Localization, permissions_result: dict[str, Any]) -> str:
         """Infers a coarse access level based on effective permissions."""
+        if not permissions_result.get("verified"):
+            return i18n.level("restricted")
+
         granted = set(permissions_result.get("granted_permissions", []))
 
         admin_requirements = {
@@ -324,6 +434,19 @@ class GCPAccessAuditor:
         permissions_result: dict[str, Any],
     ) -> list[str]:
         """Creates actionable recommendations based on missing permissions."""
+        if not permissions_result.get("verified"):
+            if permissions_result.get("not_verified_reason") == "resource_manager_api_disabled":
+                return [
+                    "Enable Cloud Resource Manager API and run the audit again."
+                    if i18n.language == "en"
+                    else "Habilite a Cloud Resource Manager API e execute a auditoria novamente."
+                ]
+            return [
+                "Permission checks could not be fully verified. Review API availability and rerun."
+                if i18n.language == "en"
+                else "As permissões não puderam ser verificadas completamente. Revise as APIs e rode novamente."
+            ]
+
         missing = set(permissions_result.get("missing_permissions", []))
         recommendations: list[str] = []
 
@@ -388,7 +511,11 @@ def summarize_report_for_terminal(report: dict[str, Any], language: str) -> dict
 
     capabilities = payload.get(capabilities_key, {})
     allowed_tokens = {"permitido", "allowed"}
+    not_verified_tokens = {"nao_verificado", "not_verified"}
     allowed_count = sum(1 for value in capabilities.values() if str(value).lower() in allowed_tokens)
+    not_verified_count = sum(
+        1 for value in capabilities.values() if str(value).lower() in not_verified_tokens
+    )
 
     connection_status = payload.get(connection_key, {}).get("status")
     return {
@@ -396,6 +523,7 @@ def summarize_report_for_terminal(report: dict[str, Any], language: str) -> dict
         "connection_status": connection_status,
         "access_level": payload.get(access_level_key),
         "allowed_capabilities": allowed_count,
+        "not_verified_capabilities": not_verified_count,
         "total_capabilities": len(capabilities),
     }
 
@@ -506,6 +634,11 @@ def main() -> None:
     logger.info(
         "✅ Allowed capabilities: %s/%s",
         summary["allowed_capabilities"],
+        summary["total_capabilities"],
+    )
+    logger.info(
+        "🟡 Not verified capabilities: %s/%s",
+        summary["not_verified_capabilities"],
         summary["total_capabilities"],
     )
 

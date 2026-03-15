@@ -1,17 +1,17 @@
 Relatório de Acesso GCP
 =======================
-Data de execução: 2026-03-14 23:53:47
+Data de execução: 2026-03-14 23:59:18
 Caminho do projeto: C:\Users\marco\Documents\code_classes\GCP-Data-Engineering-Foundations
 
 Resumo de acessos:
 {
-  "Criar buckets": "negado",
-  "Deletar buckets": "negado",
-  "Enviar arquivos (upload)": "negado",
-  "Excluir arquivos": "negado",
+  "Criar buckets": "nao_verificado",
+  "Deletar buckets": "permitido",
+  "Enviar arquivos (upload)": "permitido",
+  "Excluir arquivos": "permitido",
   "Ler arquivos": "negado",
-  "Ler projeto": "negado",
-  "Ler política IAM do projeto": "negado",
+  "Ler projeto": "nao_verificado",
+  "Ler política IAM do projeto": "nao_verificado",
   "Ler metadados de bucket": "permitido"
 }
 
@@ -28,13 +28,13 @@ Relatório completo:
     "hierarquia": {
       "status": "falhou",
       "http_status": 403,
-      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"serviceTitle\": \"Cloud Resource Manager API\",\n          \"consumer\": \"projects/global-grammar-432121-d7\",\n          \"containerInfo\": \"global-grammar-432121-d7\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"containerInfo\": \"global-grammar-432121-d7\",\n          \"consumer\": \"projects/global-grammar-432121-d7\",\n          \"serviceTitle\": \"Cloud Resource Manager API\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
     },
     "iam": {
       "status": "falhou",
       "http_status": 403,
       "can_read_iam_policy": false,
-      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"serviceTitle\": \"Cloud Resource Manager API\",\n          \"containerInfo\": \"global-grammar-432121-d7\",\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"consumer\": \"projects/global-grammar-432121-d7\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"serviceTitle\": \"Cloud Resource Manager API\",\n          \"containerInfo\": \"global-grammar-432121-d7\",\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"consumer\": \"projects/global-grammar-432121-d7\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
     },
     "permissoes": {
       "status": "falhou",
@@ -50,23 +50,41 @@ Relatório completo:
         "storage.objects.delete",
         "storage.objects.get"
       ],
-      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"serviceTitle\": \"Cloud Resource Manager API\",\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"consumer\": \"projects/global-grammar-432121-d7\",\n          \"containerInfo\": \"global-grammar-432121-d7\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+      "error": "{\n  \"error\": {\n    \"code\": 403,\n    \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\",\n    \"status\": \"PERMISSION_DENIED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"SERVICE_DISABLED\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"serviceTitle\": \"Cloud Resource Manager API\",\n          \"consumer\": \"projects/global-grammar-432121-d7\",\n          \"activationUrl\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\",\n          \"service\": \"cloudresourcemanager.googleapis.com\",\n          \"containerInfo\": \"global-grammar-432121-d7\"\n        }\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.LocalizedMessage\",\n        \"locale\": \"en-US\",\n        \"message\": \"Cloud Resource Manager API has not been used in project global-grammar-432121-d7 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.\"\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Google developers console API activation\",\n            \"url\": \"https://console.developers.google.com/apis/api/cloudresourcemanager.googleapis.com/overview?project=global-grammar-432121-d7\"\n          }\n        ]\n      }\n    ]\n  }\n}\n",
+      "verified": false,
+      "not_verified_reason": "resource_manager_api_disabled"
+    },
+    "storage_bucket_permissions": {
+      "status": "ok",
+      "verified": true,
+      "requested_permissions": [
+        "storage.buckets.get",
+        "storage.buckets.delete",
+        "storage.objects.create",
+        "storage.objects.delete",
+        "storage.objects.get"
+      ],
+      "granted_permissions": [
+        "storage.buckets.delete",
+        "storage.buckets.get",
+        "storage.objects.create",
+        "storage.objects.delete"
+      ],
+      "not_verified_reason": null
     },
     "capacidades": {
-      "Criar buckets": "negado",
-      "Deletar buckets": "negado",
-      "Enviar arquivos (upload)": "negado",
-      "Excluir arquivos": "negado",
+      "Criar buckets": "nao_verificado",
+      "Deletar buckets": "permitido",
+      "Enviar arquivos (upload)": "permitido",
+      "Excluir arquivos": "permitido",
       "Ler arquivos": "negado",
-      "Ler projeto": "negado",
-      "Ler política IAM do projeto": "negado",
+      "Ler projeto": "nao_verificado",
+      "Ler política IAM do projeto": "nao_verificado",
       "Ler metadados de bucket": "permitido"
     },
     "nivel_de_acesso": "RESTRITO",
     "acoes_recomendadas": [
-      "Solicite um papel com storage.buckets.create (ex.: Storage Admin).",
-      "Solicite permissão de upload de objetos (storage.objects.create).",
-      "Solicite acesso de leitura da política IAM do projeto."
+      "Habilite a Cloud Resource Manager API e execute a auditoria novamente."
     ]
   }
 }

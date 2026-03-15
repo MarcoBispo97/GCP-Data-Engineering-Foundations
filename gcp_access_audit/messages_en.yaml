@@ -13,6 +13,7 @@ values:
   failed: "failed"
   allowed: "allowed"
   denied: "denied"
+  not_verified: "not_verified"
 
 levels:
   admin: "ADMIN"

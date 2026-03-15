@@ -13,6 +13,7 @@ values:
   failed: "falhou"
   allowed: "permitido"
   denied: "negado"
+  not_verified: "nao_verificado"
 
 levels:
   admin: "ADMINISTRADOR"
