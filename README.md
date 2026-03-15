@@ -47,7 +47,6 @@ This project contains practical Google Cloud Platform (GCP) exercises and notes,
 - `0_gcp_commands_utils.ipynb`: GCP helper commands and utilities.
 - `1-Data_Engineering_Fundations.ipynb`: Data Engineering foundations.
 - `2-Google_cloud-data-storage.ipynb`: Cloud Storage practices.
-- `settings_gcp.ipynb`: bilingual (PT/EN) setup documentation.
 - `settings_gcp_ptbr.ipynb`: Portuguese-only setup documentation.
 - `settings_gcp_en.ipynb`: English-only setup documentation.
 

@@ -1,0 +1,19 @@
+project_id: global-grammar-432121-d7
+bucket_name: my_bucket_class_by_vs_code
+source_path: test_shakesper.txt
+
+# Optional for single-file upload.
+# If empty, the script uses the local file name.
+destination_blob_name: test_shakesper.txt
+
+# Optional prefix inside the bucket, for example: raw/texts
+# destination_prefix: raw
+
+# If source_path is a folder:
+# - true  => uploads all files recursively
+# - false => uploads only top-level files
+recursive: true
+
+# Optional service account JSON path.
+# If omitted, the script uses ADC (gcloud auth application-default login).
+# service_account_key_path: C:/path/to/key.json
