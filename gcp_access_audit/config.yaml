@@ -1,0 +1,13 @@
+language: pt-BR
+project_id: global-grammar-432121-d7
+bucket_name_for_checks: my_bucket_class_by_vs_code
+
+test_permissions:
+  - resourcemanager.projects.get
+  - resourcemanager.projects.getIamPolicy
+  - storage.buckets.create
+  - storage.buckets.delete
+  - storage.buckets.get
+  - storage.objects.create
+  - storage.objects.delete
+  - storage.objects.get

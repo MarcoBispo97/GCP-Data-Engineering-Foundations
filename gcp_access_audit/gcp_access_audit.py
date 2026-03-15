@@ -1,0 +1,521 @@
+"""Audits GCP connection and effective access capabilities.
+
+This script checks:
+- Connection health with Google Cloud APIs.
+- Project hierarchy visibility.
+- IAM policy visibility.
+- Effective permissions related to bucket/object operations.
+
+It also exports TXT reports automatically in PT-BR and EN.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
+
+import google.auth
+from google.auth.transport.requests import AuthorizedSession
+from google.cloud import storage
+import yaml
+
+
+def setup_logging() -> logging.Logger:
+    """Configures friendly terminal logging.
+
+    Returns:
+        Configured logger instance.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
+    return logging.getLogger("gcp_access_audit")
+
+
+@dataclass(frozen=True)
+class AuditConfig:
+    """Holds configuration for the GCP access audit.
+
+    Attributes:
+        language: Report language. Accepted values: "pt-BR" or "en".
+        project_id: GCP project ID to inspect.
+        bucket_name_for_checks: Existing bucket used to validate metadata access.
+        test_permissions: IAM permissions to evaluate via testIamPermissions.
+    """
+
+    language: str
+    project_id: str
+    bucket_name_for_checks: str
+    test_permissions: list[str]
+
+
+class Localization:
+    """Loads localized labels and value tokens from YAML files."""
+
+    def __init__(self, base_dir: Path, language: str) -> None:
+        """Initializes localization resources.
+
+        Args:
+            base_dir: Directory containing language YAML files.
+            language: Language code from config.
+
+        Raises:
+            ValueError: If language is unsupported.
+        """
+        message_file = (
+            base_dir / "messages_pt-BR.yaml"
+            if language == "pt-BR"
+            else base_dir / "messages_en.yaml"
+            if language == "en"
+            else None
+        )
+        if message_file is None:
+            raise ValueError("Unsupported language. Use 'pt-BR' or 'en'.")
+
+        self.language = language
+        self.messages = self._load_yaml(message_file)
+
+    def label(self, key: str) -> str:
+        """Returns a localized label key."""
+        return str(self.messages["labels"][key])
+
+    def value(self, key: str) -> str:
+        """Returns a localized value token."""
+        return str(self.messages["values"][key])
+
+    def level(self, key: str) -> str:
+        """Returns a localized access level label."""
+        return str(self.messages["levels"][key])
+
+    def capability_name(self, key: str) -> str:
+        """Returns a localized capability display name."""
+        return str(self.messages["capability_names"][key])
+
+    @staticmethod
+    def _load_yaml(path: Path) -> dict[str, Any]:
+        """Loads a YAML file into a dictionary."""
+        with path.open("r", encoding="utf-8") as file:
+            loaded = yaml.safe_load(file) or {}
+        if not isinstance(loaded, dict):
+            raise ValueError(f"Invalid YAML structure in: {path}")
+        return loaded
+
+
+class GCPAccessAuditor:
+    """Performs connection and access checks against GCP APIs."""
+
+    def __init__(self, config: AuditConfig) -> None:
+        """Initializes auth/session clients for auditing."""
+        self.config = config
+        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", config.project_id)
+        credentials, detected_project = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        self.credentials = credentials
+        self.detected_project = detected_project
+        self.session = AuthorizedSession(credentials)
+        self.storage_client = storage.Client(project=config.project_id, credentials=credentials)
+
+    def run(self, i18n: Localization) -> dict[str, Any]:
+        """Executes the full audit and builds a localized report."""
+        connection = self._check_connection(i18n)
+        hierarchy = self._check_hierarchy(i18n)
+        iam = self._check_iam_visibility(i18n)
+        permissions_result = self._check_permissions(i18n)
+        bucket_metadata = self._check_bucket_metadata_access(i18n)
+
+        capabilities = self._build_capabilities(i18n, permissions_result, bucket_metadata)
+        level = self._infer_access_level(i18n, permissions_result)
+        recommendations = self._build_recommendations(i18n, permissions_result)
+
+        return {
+            i18n.label("report_title"): {
+                i18n.label("connection"): connection,
+                i18n.label("hierarchy"): hierarchy,
+                i18n.label("iam"): iam,
+                i18n.label("permissions"): permissions_result,
+                i18n.label("capabilities"): capabilities,
+                i18n.label("access_level"): level,
+                i18n.label("recommended_actions"): recommendations,
+            }
+        }
+
+    def _check_connection(self, i18n: Localization) -> dict[str, Any]:
+        """Checks token/session and storage API connectivity."""
+        try:
+            self.storage_client.list_buckets(project=self.config.project_id, max_results=1)
+            return {
+                "status": i18n.value("ok"),
+                "project_from_config": self.config.project_id,
+                "project_from_credentials": self.detected_project,
+            }
+        except Exception as error:
+            return {
+                "status": i18n.value("failed"),
+                "project_from_config": self.config.project_id,
+                "project_from_credentials": self.detected_project,
+                "error": str(error),
+            }
+
+    def _check_hierarchy(self, i18n: Localization) -> dict[str, Any]:
+        """Reads project metadata (including parent hierarchy when available)."""
+        url = f"https://cloudresourcemanager.googleapis.com/v1/projects/{self.config.project_id}"
+        response = self.session.get(url)
+        if response.status_code != 200:
+            return {
+                "status": i18n.value("failed"),
+                "http_status": response.status_code,
+                "error": response.text,
+            }
+
+        payload = response.json()
+        parent = payload.get("parent") or {}
+        return {
+            "status": i18n.value("ok"),
+            "project_id": payload.get("projectId"),
+            "project_number": payload.get("projectNumber"),
+            "lifecycle_state": payload.get("lifecycleState"),
+            "parent_type": parent.get("type"),
+            "parent_id": parent.get("id"),
+        }
+
+    def _check_iam_visibility(self, i18n: Localization) -> dict[str, Any]:
+        """Checks if current identity can read project IAM policy."""
+        url = (
+            f"https://cloudresourcemanager.googleapis.com/v1/projects/{self.config.project_id}:getIamPolicy"
+        )
+        response = self.session.post(url, json={})
+        if response.status_code != 200:
+            return {
+                "status": i18n.value("failed"),
+                "http_status": response.status_code,
+                "can_read_iam_policy": False,
+                "error": response.text,
+            }
+
+        payload = response.json()
+        bindings = payload.get("bindings", [])
+        return {
+            "status": i18n.value("ok"),
+            "can_read_iam_policy": True,
+            "binding_count": len(bindings),
+            "etag_present": bool(payload.get("etag")),
+        }
+
+    def _check_permissions(self, i18n: Localization) -> dict[str, Any]:
+        """Evaluates effective permissions using projects:testIamPermissions."""
+        url = (
+            f"https://cloudresourcemanager.googleapis.com/v1/projects/{self.config.project_id}:testIamPermissions"
+        )
+        response = self.session.post(url, json={"permissions": self.config.test_permissions})
+
+        if response.status_code != 200:
+            return {
+                "status": i18n.value("failed"),
+                "http_status": response.status_code,
+                "granted_permissions": [],
+                "missing_permissions": self.config.test_permissions,
+                "error": response.text,
+            }
+
+        payload = response.json()
+        granted = payload.get("permissions", [])
+        granted_set = set(granted)
+        missing = [perm for perm in self.config.test_permissions if perm not in granted_set]
+
+        return {
+            "status": i18n.value("ok"),
+            "granted_permissions": granted,
+            "missing_permissions": missing,
+        }
+
+    def _check_bucket_metadata_access(self, i18n: Localization) -> dict[str, Any]:
+        """Checks whether configured bucket metadata is readable."""
+        try:
+            bucket = self.storage_client.lookup_bucket(self.config.bucket_name_for_checks)
+            if bucket is None:
+                return {
+                    "status": i18n.value("failed"),
+                    "can_read_bucket_metadata": False,
+                    "bucket_exists_or_visible": False,
+                }
+
+            return {
+                "status": i18n.value("ok"),
+                "can_read_bucket_metadata": True,
+                "bucket_exists_or_visible": True,
+                "bucket_location": bucket.location,
+            }
+        except Exception as error:
+            return {
+                "status": i18n.value("failed"),
+                "can_read_bucket_metadata": False,
+                "bucket_exists_or_visible": False,
+                "error": str(error),
+            }
+
+    def _build_capabilities(
+        self,
+        i18n: Localization,
+        permissions_result: dict[str, Any],
+        bucket_metadata: dict[str, Any],
+    ) -> dict[str, str]:
+        """Builds localized capability map based on permission checks."""
+        granted = set(permissions_result.get("granted_permissions", []))
+
+        capability_rules = {
+            "create_bucket": "storage.buckets.create",
+            "delete_bucket": "storage.buckets.delete",
+            "upload_object": "storage.objects.create",
+            "delete_object": "storage.objects.delete",
+            "read_object": "storage.objects.get",
+            "read_project": "resourcemanager.projects.get",
+            "read_iam_policy": "resourcemanager.projects.getIamPolicy",
+        }
+
+        capability_map: dict[str, str] = {}
+        for capability_key, permission_key in capability_rules.items():
+            capability_map[i18n.capability_name(capability_key)] = (
+                i18n.value("allowed") if permission_key in granted else i18n.value("denied")
+            )
+
+        capability_map[i18n.capability_name("read_bucket_metadata")] = (
+            i18n.value("allowed")
+            if bucket_metadata.get("can_read_bucket_metadata")
+            else i18n.value("denied")
+        )
+        return capability_map
+
+    def _infer_access_level(self, i18n: Localization, permissions_result: dict[str, Any]) -> str:
+        """Infers a coarse access level based on effective permissions."""
+        granted = set(permissions_result.get("granted_permissions", []))
+
+        admin_requirements = {
+            "storage.buckets.create",
+            "storage.buckets.delete",
+            "storage.objects.create",
+            "storage.objects.delete",
+            "resourcemanager.projects.getIamPolicy",
+        }
+        editor_requirements = {
+            "storage.objects.create",
+            "storage.objects.delete",
+            "resourcemanager.projects.get",
+        }
+        viewer_requirements = {
+            "resourcemanager.projects.get",
+            "storage.objects.get",
+        }
+
+        if admin_requirements.issubset(granted):
+            return i18n.level("admin")
+        if editor_requirements.issubset(granted):
+            return i18n.level("editor")
+        if viewer_requirements.intersection(granted):
+            return i18n.level("viewer")
+        return i18n.level("restricted")
+
+    def _build_recommendations(
+        self,
+        i18n: Localization,
+        permissions_result: dict[str, Any],
+    ) -> list[str]:
+        """Creates actionable recommendations based on missing permissions."""
+        missing = set(permissions_result.get("missing_permissions", []))
+        recommendations: list[str] = []
+
+        if not missing:
+            recommendations.append(
+                "Permissions baseline is complete for tested actions."
+                if i18n.language == "en"
+                else "Baseline de permissões completo para as ações testadas."
+            )
+            return recommendations
+
+        if "storage.buckets.create" in missing:
+            recommendations.append(
+                "Ask for a role including storage.buckets.create (example: Storage Admin)."
+                if i18n.language == "en"
+                else "Solicite um papel com storage.buckets.create (ex.: Storage Admin)."
+            )
+        if "storage.objects.create" in missing:
+            recommendations.append(
+                "Ask for object upload permission (storage.objects.create)."
+                if i18n.language == "en"
+                else "Solicite permissão de upload de objetos (storage.objects.create)."
+            )
+        if "resourcemanager.projects.getIamPolicy" in missing:
+            recommendations.append(
+                "Ask for IAM policy read access on the project."
+                if i18n.language == "en"
+                else "Solicite acesso de leitura da política IAM do projeto."
+            )
+
+        if not recommendations:
+            recommendations.append(
+                "Review missing permissions and request least-privilege roles as needed."
+                if i18n.language == "en"
+                else "Revise as permissões ausentes e solicite papéis mínimos necessários."
+            )
+
+        return recommendations
+
+
+def run_audit(base_dir: Path, config: AuditConfig, language: str) -> dict[str, Any]:
+    """Runs one audit execution for a target language."""
+    localized_config = AuditConfig(
+        language=language,
+        project_id=config.project_id,
+        bucket_name_for_checks=config.bucket_name_for_checks,
+        test_permissions=config.test_permissions,
+    )
+    i18n = Localization(base_dir, language)
+    auditor = GCPAccessAuditor(localized_config)
+    return auditor.run(i18n)
+
+
+def summarize_report_for_terminal(report: dict[str, Any], language: str) -> dict[str, Any]:
+    """Builds a compact and friendly terminal summary from the report."""
+    title = next(iter(report.keys()))
+    payload = report[title]
+
+    capabilities_key = "capacidades" if language == "pt-BR" else "capabilities"
+    access_level_key = "nivel_de_acesso" if language == "pt-BR" else "access_level"
+    connection_key = "conexao" if language == "pt-BR" else "connection"
+
+    capabilities = payload.get(capabilities_key, {})
+    allowed_tokens = {"permitido", "allowed"}
+    allowed_count = sum(1 for value in capabilities.values() if str(value).lower() in allowed_tokens)
+
+    connection_status = payload.get(connection_key, {}).get("status")
+    return {
+        "title": title,
+        "connection_status": connection_status,
+        "access_level": payload.get(access_level_key),
+        "allowed_capabilities": allowed_count,
+        "total_capabilities": len(capabilities),
+    }
+
+
+def build_txt_content(
+    report: dict[str, Any],
+    language: str,
+    executed_at: str,
+    project_root: Path,
+) -> str:
+    """Builds plain text content for report export."""
+    title = next(iter(report.keys()))
+    payload = report[title]
+
+    capabilities_key = "capacidades" if language == "pt-BR" else "capabilities"
+    access_level_key = "nivel_de_acesso" if language == "pt-BR" else "access_level"
+
+    if language == "pt-BR":
+        header_date = f"Data de execução: {executed_at}"
+        header_path = f"Caminho do projeto: {project_root}"
+        summary_title = "Resumo de acessos:"
+        level_title = "Nível de acesso"
+        full_title = "Relatório completo:"
+    else:
+        header_date = f"Execution date: {executed_at}"
+        header_path = f"Project path: {project_root}"
+        summary_title = "Access summary:"
+        level_title = "Access level"
+        full_title = "Full report:"
+
+    lines = [
+        title,
+        "=" * len(title),
+        header_date,
+        header_path,
+        "",
+        summary_title,
+        json.dumps(payload.get(capabilities_key, {}), indent=2, ensure_ascii=False),
+        "",
+        f"{level_title}: {payload.get(access_level_key)}",
+        "",
+        full_title,
+        json.dumps(report, indent=2, ensure_ascii=False),
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def export_txt_reports(base_dir: Path, config: AuditConfig, logger: logging.Logger) -> None:
+    """Exports PT-BR and EN TXT reports automatically."""
+    project_root = base_dir.parent
+    executed_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    outputs = [
+        ("pt-BR", base_dir / "relatorio_acesso_ptbr.txt"),
+        ("en", base_dir / "access_report_en.txt"),
+    ]
+
+    for language, target_path in outputs:
+        report = run_audit(base_dir, config, language)
+        content = build_txt_content(report, language, executed_at, project_root)
+        target_path.write_text(content, encoding="utf-8")
+        logger.info("📄 TXT exported: %s", target_path)
+
+
+def load_config(config_path: Path) -> AuditConfig:
+    """Loads the audit configuration from YAML."""
+    with config_path.open("r", encoding="utf-8") as file:
+        loaded = yaml.safe_load(file) or {}
+
+    if not isinstance(loaded, dict):
+        raise ValueError("config.yaml must contain a key-value mapping.")
+
+    language = str(loaded.get("language", "pt-BR"))
+    project_id = str(loaded.get("project_id", "")).strip()
+    bucket_name_for_checks = str(loaded.get("bucket_name_for_checks", "")).strip()
+    test_permissions = loaded.get("test_permissions") or []
+
+    if not project_id:
+        raise ValueError("config.yaml: 'project_id' is required.")
+    if not bucket_name_for_checks:
+        raise ValueError("config.yaml: 'bucket_name_for_checks' is required.")
+    if not isinstance(test_permissions, list) or not all(
+        isinstance(item, str) for item in test_permissions
+    ):
+        raise ValueError("config.yaml: 'test_permissions' must be a list of strings.")
+
+    return AuditConfig(
+        language=language,
+        project_id=project_id,
+        bucket_name_for_checks=bucket_name_for_checks,
+        test_permissions=test_permissions,
+    )
+
+
+def main() -> None:
+    """Runs the GCP access audit with friendly logs and auto TXT export."""
+    logger = setup_logging()
+    base_dir = Path(__file__).resolve().parent
+    config = load_config(base_dir / "config.yaml")
+
+    logger.info("🚀 Starting GCP access audit...")
+    report = run_audit(base_dir, config, config.language)
+
+    summary = summarize_report_for_terminal(report, config.language)
+    logger.info("🔌 Connection status: %s", summary["connection_status"])
+    logger.info("🛡️ Access level: %s", summary["access_level"])
+    logger.info(
+        "✅ Allowed capabilities: %s/%s",
+        summary["allowed_capabilities"],
+        summary["total_capabilities"],
+    )
+
+    logger.info("🧾 Full report (JSON):")
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+
+    logger.info("📦 Exporting TXT reports automatically (PT-BR + EN)...")
+    export_txt_reports(base_dir, config, logger)
+    logger.info("🎉 Audit flow completed.")
+
+
+if __name__ == "__main__":
+    main()

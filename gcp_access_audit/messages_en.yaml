@@ -1,0 +1,31 @@
+labels:
+  report_title: "GCP Access Report"
+  connection: "connection"
+  hierarchy: "hierarchy"
+  iam: "iam"
+  permissions: "permissions"
+  capabilities: "capabilities"
+  access_level: "access_level"
+  recommended_actions: "recommended_actions"
+
+values:
+  ok: "ok"
+  failed: "failed"
+  allowed: "allowed"
+  denied: "denied"
+
+levels:
+  admin: "ADMIN"
+  editor: "EDITOR"
+  viewer: "VIEWER"
+  restricted: "RESTRICTED"
+
+capability_names:
+  create_bucket: "Create buckets"
+  delete_bucket: "Delete buckets"
+  read_bucket_metadata: "Read bucket metadata"
+  upload_object: "Upload objects"
+  delete_object: "Delete objects"
+  read_object: "Read objects"
+  read_project: "Read project"
+  read_iam_policy: "Read project IAM policy"
